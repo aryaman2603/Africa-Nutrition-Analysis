@@ -92,3 +92,17 @@ ggsave(filename = "../outputs/figures/KMeans_Clusters.png",
        height = 8, 
        dpi = 300, 
        bg = "white")
+
+clustering_data_with_clusters <- clustering_data %>%
+  rownames_to_column(var = "location_name") %>%
+  mutate(Cluster = as.factor(k_model$cluster))
+
+cluster_profiles <- clustering_data_with_clusters %>%
+  group_by(Cluster) %>%
+  summarise(across(where(is.numeric), mean, na.rm = TRUE))
+
+print(cluster_profiles)
+
+write_csv(cluster_profiles, "../outputs/reports/Cluster_Nutrient_Profiles.csv")
+
+write_csv(clustering_data_with_clusters, "../outputs/reports/Country_Cluster_Assignments.csv")
