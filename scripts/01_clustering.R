@@ -106,3 +106,75 @@ print(cluster_profiles)
 write_csv(cluster_profiles, "../outputs/reports/Cluster_Nutrient_Profiles.csv")
 
 write_csv(clustering_data_with_clusters, "../outputs/reports/Country_Cluster_Assignments.csv")
+
+library(dplyr)
+library(tidyr)
+
+scoring_data <- cluster_profiles %>%
+  pivot_longer(cols = -Cluster, names_to = "nutrient", values_to = "mean_intake") %>%
+  mutate(
+    optimization_goal = if_else(nutrient %in% c("Sodium", "Sugar", "Red_Meat"), "Minimize", "Maximize")
+  ) %>%
+  group_by(nutrient) %>%
+  mutate(
+    nutrient_rank = if_else(optimization_goal == "Maximize",
+                            rank(mean_intake, ties.method = "min"),
+                            rank(-mean_intake, ties.method = "min"))
+  ) %>%
+  ungroup()
+
+cluster_final_scores <- scoring_data %>%
+  group_by(Cluster) %>%
+  summarise(
+    composite_score = sum(nutrient_rank)
+  ) %>%
+  arrange(desc(composite_score))
+
+print(cluster_final_scores)
+
+install.packages("fmsb")
+library(fmsb)
+library(tibble)
+
+radar_data <- cluster_profiles %>%
+  column_to_rownames(var = "Cluster")
+
+max_min <- data.frame(
+  rbind(
+    apply(radar_data, 2, max) * 1.1,
+    apply(radar_data, 2, min) * 0.9
+  )
+)
+colnames(max_min) <- colnames(radar_data)
+
+df_radar <- rbind(max_min, radar_data)
+
+colors_border <- c("#E74C3C", "#2ECC71", "#3498DB", "#F1C40F")
+colors_in <- c(rgb(231,76,60, max=255, alpha=76), 
+               rgb(46,204,113, max=255, alpha=76), 
+               rgb(52,152,219, max=255, alpha=76), 
+               rgb(241,196,15, max=255, alpha=76))
+
+png("outputs/figures/Cluster_Radar_Chart.png", width = 2400, height = 2400, res = 300)
+
+radarchart(df_radar,
+           axistype = 0,
+           pcol = colors_border,
+           pfcol = colors_in,
+           plwd = 2,
+           plty = 1,
+           cglcol = "grey",
+           cglty = 1,
+           vlcex = 1.2,
+           title = "Multidimensional Nutritional Profiles by Cluster")
+
+legend(x = "topright", 
+       legend = paste("Cluster", rownames(radar_data)), 
+       bty = "n", 
+       pch = 20, 
+       col = colors_border, 
+       text.col = "black", 
+       cex = 1.2, 
+       pt.cex = 3)
+
+dev.off()
